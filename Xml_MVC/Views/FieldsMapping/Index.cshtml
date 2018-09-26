@@ -1,0 +1,155 @@
+﻿@model IEnumerable<Xml_MVC.Models.MappingFieldsModel>
+@{
+	ViewBag.Title = "Fields Mapping";
+}
+<h2>Fields List</h2>
+@using(Html.BeginForm("Upload", "FieldsMapping", FormMethod.Post, new { enctype = "multipart/form-data" }))
+{
+	<div class="upload_file">
+		<input type="file" id="fileUpload" name="fileUpload" />
+		<br />
+		<p><input type="submit" value="Upload" /></p>
+	</div>
+	<script language="javascript" type="text/javascript" src="~/Scripts/jquery-1.10.2.min.js"></script>
+	<script>
+		$(document).ready(function () {
+			$("body").on("click", ".checkbox-item input", function () {
+				var checkboxId = $(this).attr('id');
+				var textboxId = '#customFieldText' + checkboxId.replace('isCustom', '');
+				var ddlID = '#ddl' + checkboxId.replace('isCustom', '');
+
+				if ($(this).is(":checked")) {
+					$(textboxId).css('color', '');
+					$(textboxId).removeAttr('readonly');
+
+					$(ddlID).css('background-color', 'light-grey');
+					$(ddlID).attr('disabled', true);
+				}
+				else {
+					$(textboxId).css('color', 'red');
+					$(textboxId).attr('readonly', true);
+
+					$(ddlID).css('background-color', '');
+					$(ddlID).attr('disabled', false);
+				}
+			});
+
+			var tabledata = [];
+			$('#exportButton').click(function (event) {
+				var isValid = true;
+				var errorList = [];
+				errorList.push('Fix following fields:');
+
+				var table = $('#fieldTable');
+				table.find('tr').each(function (rowIndex, r) {
+					var cols = [];
+					var rowName = $(this).find(".label-item").text().trim();
+					// I chose not to go to each <td> element as each row has teh same set of controls
+					//$(this).find('td').each(function (colIndex, c) {
+					//	if (c.tagName === 'TD') {
+					var labelControl = $(this).find("td .label-item");
+					if (typeof labelControl !== "undefined" && labelControl.text().trim() !== "undefined" && labelControl.text().trim() !== "") {
+						cols.push(labelControl.text().trim());
+					}
+
+					var dropdownControl = $(this).find("td .dropdown-item > select");
+					var checkboxControl = $(this).find("td .checkbox-item > input");
+
+					// If checkbox is checked, select TextBox
+					if (typeof checkboxControl !== "undefined") {
+						if (checkboxControl.is(':checked')) {
+							var textboxControl = $(this).find("td .textbox-item > input");
+							if (typeof textboxControl === "undefined" || textboxControl.val() === "") {
+								errorList.push('Line#: ' + (rowIndex + 1) + ': ' + rowName);
+								isValid = false;
+							}
+							else {
+								cols.push(textboxControl.val());
+							}
+						}
+						else {
+							if (typeof dropdownControl === "undefined" || dropdownControl.val() === "") {
+								errorList.push('Line#: ' + (rowIndex + 1) + ': ' + rowName);
+								isValid = false;
+							}
+							else {
+								if (typeof dropdownControl.val() !== "undefined") {
+									cols.push(dropdownControl.val());
+								}
+							}
+						}
+					}
+					//	}
+					//});
+					tabledata.push(cols);
+				});
+
+				if (!isValid) {
+					errorList.push('\nEither select a value from dropdown or check the box and provide a Custom Field Name.')
+					alert(errorList.join("\n"));
+					event.preventDefault();
+				}
+				else {
+					tabledata = tabledata.slice(0);
+					tabledata.splice(0, 1);
+
+					$.ajax({
+						type: "POST",
+						url: "/FieldsMapping/Export",
+						contentType: 'application/json',
+						dataType: "json",
+						data: JSON.stringify({ 'exportData': tabledata }),
+						success: function (returnValue) {
+							window.location = '/FieldsMapping/Download?file=' + returnValue.FileName;
+							alert('Downloading File...');
+						}
+					});
+				}
+			});
+		});
+	</script>
+	if(@ViewBag.ShowList)
+	{
+		<table id="fieldTable" class="table" width="500">
+			<tr>
+				<th>
+					Incoming Field Name
+				</th>
+				<th>
+					@Html.DisplayNameFor(model => model.SystemFields)
+				</th>
+				<th>
+					Custom Field
+				</th>
+			</tr>
+			@{
+				foreach(var item in Model)
+				{
+					<tr>
+						<td>
+							<div class="label-item">
+								@Html.DisplayFor(modelItem => item.IncomingFieldName)
+							</div>
+						</td>
+						<td>
+							<div class="dropdown-item">
+								@Html.DropDownListFor(modelItem => item.SystemFields, new SelectList(item.SystemFields), new { @id = "ddl" + item.IncomingFieldName })
+							</div>
+						</td>
+						<td>
+							<div class="checkbox-item">
+								@Html.CheckBox("isCustom", false, new { @id = "isCustom" + item.IncomingFieldName })
+							</div>
+							<div class="textbox-item">
+								@Html.TextBox("customFieldText", "", new { @readonly = "readonly", @id = "customFieldText" + item.IncomingFieldName })
+							</div>
+						</td>
+					</tr>
+				}
+			}
+		</table>
+
+		<p><input id="exportButton" type="submit" value="Export" /></p>
+
+	}
+}
