@@ -12,10 +12,11 @@ namespace Xml_MVC.Controllers
 	public class FieldsMappingController : Controller
 	{
 		HashSet<string> internalFields = new HashSet<string>();
+
 		// GET: FieldsMapping
 		public ActionResult Index()
 		{
-			if(TempData["userData"] == null)
+			if (TempData["userData"] == null)
 			{
 				ViewBag.ShowList = false;
 				return View();
@@ -28,6 +29,10 @@ namespace Xml_MVC.Controllers
 			}
 		}
 
+		/// <summary>
+		/// POST action that parses the XML and sends back <see cref="MappingFieldsModel"/>
+		/// essentially the grid view data.
+		/// </summary>
 		[HttpPost]
 		public ActionResult Upload()
 		{
@@ -37,16 +42,23 @@ namespace Xml_MVC.Controllers
 
 				List<MappingFieldsModel> fieldsList = new List<MappingFieldsModel>();
 				var file = Request.Files[0];
-				if(file != null && file.ContentLength > 0)
+
+				if (Path.GetExtension(file.FileName).ToLower() != "xml")
+				{
+					//return RedirectToAction("Index");
+					throw new Exception("Only XML");
+				}
+
+				if (file != null && file.ContentLength > 0)
 				{
 					XmlDocument xmldoc = new XmlDocument();
 					xmldoc.Load(file.InputStream);
 					MappingFieldsModel outputFields;
 					XmlNode firstProductNode = xmldoc.GetElementsByTagName("Product")[0];
 
-					foreach(XmlNode sectionNode in firstProductNode.ChildNodes)
+					foreach (XmlNode sectionNode in firstProductNode.ChildNodes)
 					{
-						foreach(XmlNode childNode in sectionNode.ChildNodes)
+						foreach (XmlNode childNode in sectionNode.ChildNodes)
 						{
 							string nodeName = childNode.LocalName;
 							List<string> list = new List<string>();
@@ -56,7 +68,7 @@ namespace Xml_MVC.Controllers
 							outputFields.IncomingFieldName = nodeName;
 
 							list.AddRange(internalFields);
-							if(internalFields.Contains(nodeName))
+							if (internalFields.Contains(nodeName))
 							{
 								list.Remove("");
 								list.Remove(nodeName);
@@ -71,18 +83,23 @@ namespace Xml_MVC.Controllers
 				}
 				return RedirectToAction("Index");
 			}
-			catch(Exception ex)
+			catch (Exception ex)
 			{
 				var error = ex;
 				throw;
 			}
 		}
 
+		/// <summary>
+		/// Reads the 2-D array from POST request and writes it to a CSV
+		/// </summary>
+		/// <param name="exportData">User defined fields mapping</param>
+		/// <returns></returns>
 		[HttpPost]
 		public ActionResult Export(string[][] exportData)
 		{
 			List<ExportDataModel> data = new List<ExportDataModel>();
-			foreach(string[] row in exportData)
+			foreach (string[] row in exportData)
 			{
 				data.Add(new ExportDataModel
 				{
@@ -120,20 +137,20 @@ namespace Xml_MVC.Controllers
 		/// </summary>
 		/// <param name="data">In form of <see cref="ExportDataModel"/> list</param>
 		/// <param name="file">Location</param>
-		public void WriteTsv<T>(IEnumerable<T> data, string file)
+		private void WriteTsv<T>(IEnumerable<T> data, string file)
 		{
-			using(StreamWriter output = new StreamWriter(file))
+			using (StreamWriter output = new StreamWriter(file))
 			{
 				PropertyDescriptorCollection props = TypeDescriptor.GetProperties(typeof(T));
-				foreach(PropertyDescriptor prop in props)
+				foreach (PropertyDescriptor prop in props)
 				{
 					output.Write(prop.DisplayName); // header
 					output.Write(",");
 				}
 				output.WriteLine();
-				foreach(T item in data)
+				foreach (T item in data)
 				{
-					foreach(PropertyDescriptor prop in props)
+					foreach (PropertyDescriptor prop in props)
 					{
 						output.Write(prop.Converter.ConvertToString(
 							 prop.GetValue(item)));
@@ -145,7 +162,7 @@ namespace Xml_MVC.Controllers
 		}
 
 		/// <summary>
-		/// Basically looks at the DB table and saves all the columns in <see cref="internalFields"/>
+		/// Looks at the DB table and saves all the columns in <see cref="internalFields"/>
 		/// </summary>
 		private void ReadSystemFields()
 		{
@@ -167,13 +184,13 @@ ORDER BY c.Name";
 			{
 				myConnection.Open();
 				myReader = myCommand.ExecuteReader();
-				while(myReader.Read())
+				while (myReader.Read())
 				{
 					// orderFields.Add(myReader["Name"].ToString());
 					internalFields.Add(myReader["Name"].ToString());
 				}
 			}
-			catch(Exception ex)
+			catch (Exception ex)
 			{
 				throw ex;
 			}
